@@ -8,7 +8,7 @@
 
 #include "calc.h"
 
-#define MAX_EXP_LEN (1 << 15)
+#define MAX_EXP_LEN (1 << 16)
 
 
 void
@@ -41,7 +41,7 @@ calc_prog_1(char *host)
     clnt_perror (clnt, "call failed");
   }
 
-  printf("The answer is %d\n", *eval_1_arg);
+  printf("The answer is %d\n", *result_1);
 
 #ifndef	DEBUG
 
