@@ -10,9 +10,12 @@
 int *
 eval_1_svc(char **argp, struct svc_req *rqstp)
 {
-  static int  result;
+  static int result;
 
   result = EvalInfixExp(*argp);
+
+  printf("Received exp : %s\n", *argp);
+  printf("result : %d\n\n", result);
 
   return &result;
 }
