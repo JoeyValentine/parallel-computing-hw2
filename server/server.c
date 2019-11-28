@@ -14,7 +14,7 @@ main(int argc, char *argv[])
   int serv_fd, cli_fd, n_bytes_read = 0;
   struct sockaddr_in cli_addr, serv_addr;
 
-  if ((serv_fd = socket(AF_INET, SOCK_STREAM, 0) < 0)) 
+  if ((serv_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
   {
     printf("Error : Can't open stream socket!\n");
     exit(EXIT_FAILURE);
@@ -26,18 +26,16 @@ main(int argc, char *argv[])
   printf("Thread number : \n");
   scanf("%d", &n_thread);
 
-  printf("port n : %d\n");
-
   q = gen_queue(); 
   init_thread_pool(n_thread);
 
-  memset((char*)&serv_addr, 0, sizeof(cli_addr));
+  memset((char*)&serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
   serv_addr.sin_port = htons(port_num);
 
   if (setsockopt(serv_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
-      (char*)&opt_val, sizeof(opt_val)) < 0)
+      (char*)&opt_val, sizeof(opt_val)) == -1)
   {
     printf("Error : setsockopt failed\n");
     close(serv_fd);
