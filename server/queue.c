@@ -61,6 +61,28 @@ void pop(Queue *q)
         q->rear = NULL; 
 } 
 
+void destroy_q(Queue *q)
+{
+  while (!is_empty(q))
+    pop(q);
+}
+
+void print_q(Queue *q)
+{
+  QNode *cur_node;
+  for (cur_node = q->front; 
+       cur_node->next; 
+       cur_node = cur_node->next)
+    printf("[%s]\n",cur_node->elem->path);
+
+  printf("\n");
+}
+
+bool is_empty(Queue *q)
+{
+  return (q->front==NULL) ? true : false;
+}
+
 QElem* front(const Queue *q)
 {
     return q->front->elem;
