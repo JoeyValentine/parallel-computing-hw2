@@ -4,86 +4,12 @@
 Queue *q;
 pthread_t *threads;
 pthread_cond_t is_q_empty;
-pthread_mutex_t q_mutex;
+pthread_rwlock_t rw_lock;
 
-int 
-main(int argc, char *argv[])
-{
-  char buff[MAX_BUFF_LEN];
-  int port_num, n_thread, opt_val = 1;
-  int serv_fd, cli_fd, n_bytes_read = 0;
-  struct sockaddr_in cli_addr, serv_addr;
-
-  if ((serv_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-  {
-    printf("Error : Can't open stream socket!\n");
-    exit(EXIT_FAILURE);
-  }
-
-  printf("Port number : ");
-  scanf("%d", &port_num);
-
-  printf("Thread number : \n");
-  scanf("%d", &n_thread);
-
-  q = gen_queue(); 
-  init_thread_pool(n_thread);
-
-  memset((char*)&serv_addr, 0, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  serv_addr.sin_port = htons(port_num);
-
-  if (setsockopt(serv_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
-      (char*)&opt_val, sizeof(opt_val)) == -1)
-  {
-    printf("Error : setsockopt failed\n");
-    close(serv_fd);
-    exit(EXIT_FAILURE);
-  }
-
-  if (bind(serv_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
-  {
-    printf("Error : unable to bind socket in server\n");
-    close(serv_fd);
-    exit(EXIT_FAILURE);
-  }
-
-  listen(serv_fd, 5);
-
-  while (true)
-  {
-    cli_fd = accept(serv_fd, (struct sockaddr *)&cli_addr, sizeof(cli_addr));
-    
-    if (cli_fd < 0)
-    {
-       printf("Error : connection to client failed in server\n");
-       continue;
-    }
-
-    n_bytes_read = read(cli_fd, buff, sizeof(buff));
-
-    if (n_bytes_read == -1)
-    {
-       printf("Error : read error\n");
-       exit(EXIT_FAILURE);
-    }
-
-    printf("Server : str %s\n\n", buff);
-
-    close(cli_fd);
-  }
-
-  close(serv_fd);
-
-  return 0;
-}
-
-/*
 int
 main( int argc, char **argv )
 {
-    char line[10000], method[10000], path[10000], protocol[10000], idx[20000], location[20000];
+    char method[10000], path[10000], protocol[10000], idx[20000], location[20000];
     char *file;
     size_t len;
     int ich;
@@ -96,41 +22,120 @@ main( int argc, char **argv )
         send_error( 500, "Internal Error", (char*) 0, "Config error - no dir specified." );
     if ( chdir( argv[1] ) < 0 )
         send_error( 500, "Internal Error", (char*) 0, "Config error - couldn't chdir()." );
-    if ( fgets( line, sizeof(line), stdin ) == (char*) 0 )
-        send_error( 400, "Bad Request", (char*) 0, "No request found." );
-    if ( sscanf( line, "%[^ ] %[^ ] %[^ ]", method, path, protocol ) != 3 )
-        send_error( 400, "Bad Request", (char*) 0, "Can't parse request." );
-    while ( fgets( line, sizeof(line), stdin ) != (char*) 0 )
+
+    char buff[MAX_BUFF_LEN];
+    int port_num, n_thread, opt_val = 1;
+    int serv_fd, cli_fd, n_bytes_read = 0;
+    struct sockaddr_in cli_addr, serv_addr;
+
+    if ((serv_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 )
-            break;
+      printf("Error : Can't open stream socket!\n");
+      exit(EXIT_FAILURE);
     }
-    if ( strcasecmp( method, "get" ) != 0 )
-        send_error( 501, "Not Implemented", (char*) 0, "That method is not implemented." );
-    if ( path[0] != '/' )
-        send_error( 400, "Bad Request", (char*) 0, "Bad filename." );
-    file = &(path[1]);
-    strdecode( file, file );
-    if ( file[0] == '\0' )
-        file = "./";
-    len = strlen( file );
-    if ( file[0] == '/' || strcmp( file, ".." ) == 0 || strncmp( file, "../", 3 ) == 0 || strstr( file, "/../" ) != (char*) 0 || strcmp( &(file[len-3]), "/.." ) == 0 )
-        send_error( 400, "Bad Request", (char*) 0, "Illegal filename." );
-    if ( stat( file, &sb ) < 0 )
-        send_error( 404, "Not Found", (char*) 0, "File not found." );
-    if ( S_ISDIR( sb.st_mode ) )
+
+    printf("Port number : ");
+    scanf("%d", &port_num);
+
+    printf("Thread number : \n");
+    scanf("%d", &n_thread);
+
+    q = gen_queue(); 
+    init_thread_pool(n_thread);
+
+    printf("%d\n", n_thread);
+
+    for (int i = 0; i < n_thread; ++i)
+      pthread_create(&threads[i], NULL, work, NULL);
+
+    memset((char*)&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(port_num);
+
+    printf("%d\n", n_thread);
+
+    if (setsockopt(serv_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
+        (char*)&opt_val, sizeof(opt_val)) == -1)
     {
+      printf("Error : setsockopt failed\n");
+      close(serv_fd);
+      exit(EXIT_FAILURE);
+    }
+
+    if (bind(serv_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+      printf("Error : unable to bind socket in server\n");
+      close(serv_fd);
+      exit(EXIT_FAILURE);
+    }
+
+    printf("%d\n", n_thread);
+
+    listen(serv_fd, 5);
+
+    printf("%d\n", n_thread);
+
+    while (true)
+    {
+      cli_fd = accept(serv_fd, (struct sockaddr *)&cli_addr, &cli_addr);
+     
+      if (cli_fd < 0)
+      {
+         printf("Error : connection to client failed in server\n");
+         close(serv_fd);
+         continue;
+      }
+
+      n_bytes_read = read(cli_fd, buff, sizeof(buff));
+
+      pthread_rwlock_wrlock(&rw_lock);
+      push(q, gen_elem(buff));
+      pthread_rwlock_unlock(&rw_lock);
+      
+      printf("what\n");
+      print_q(q);
+      printf("the\n");
+
+/*
+      if (n_bytes_read == 0)
+        send_error( 400, "Bad Request", (char*) 0, "No request found." );
+
+      if ( sscanf( buff, "%[^ ] %[^ ] %[^ ]", method, path, protocol ) != 3 )
+        send_error( 400, "Bad Request", (char*) 0, "Can't parse request." );
+
+      if (n_bytes_read == -1)
+        send_error( 400, "Bad Request", (char*) 0, "No request found." );
+
+      if ( strcasecmp( method, "get" ) != 0 )
+        send_error( 501, "Not Implemented", (char*) 0, "That method is not implemented." );
+      if ( path[0] != '/' )
+        send_error( 400, "Bad Request", (char*) 0, "Bad filename." );
+      file = &(path[1]);
+      strdecode( file, file );
+      if ( file[0] == '\0' )
+        file = "./";
+      len = strlen( file );
+      
+      if ( file[0] == '/' || strcmp( file, ".." ) == 0 || 
+           strncmp( file, "../", 3 ) == 0 || 
+           strstr( file, "/../" ) != (char*) 0 || 
+           strcmp( &(file[len-3]), "/.." ) == 0 )
+        send_error( 400, "Bad Request", (char*) 0, "Illegal filename." );
+      if ( stat( file, &sb ) < 0 )
+        send_error( 404, "Not Found", (char*) 0, "File not found." );
+      if ( S_ISDIR( sb.st_mode ) )
+      {
         if ( file[len-1] != '/' )
         {
-            (void) snprintf(
-                            location, sizeof(location), "Location: %s/", path );
-            send_error( 302, "Found", location, "Directories must end with a slash." );
+          (void) snprintf( location, sizeof(location), "Location: %s/", path );
+          send_error( 302, "Found", location, "Directories must end with a slash." );
         }
         (void) snprintf( idx, sizeof(idx), "%sindex.html", file );
         if ( stat( idx, &sb ) >= 0 )
         {
-            file = idx;
-            goto do_file;
+          file = idx;
+          goto do_file;
         }
         send_headers( 200, "Ok", (char*) 0, "text/html", -1, sb.st_mtime );
         (void) printf( "\
@@ -155,22 +160,55 @@ main( int argc, char **argv )
     <address><a href=\"%s\">%s</a></address>\n\
   </body>\n\
 </html>\n", SERVER_URL, SERVER_NAME );
-    }
-    else
-    {
-    do_file:
-        fp = fopen( file, "r" );
-        if ( fp == (FILE*) 0 )
+      }
+      else
+      {
+        do_file:
+          fp = fopen( file, "r" );
+          if ( fp == (FILE*) 0 )
             send_error( 403, "Forbidden", (char*) 0, "File is protected." );
-        send_headers( 200, "Ok", (char*) 0, get_mime_type( file ), sb.st_size, sb.st_mtime );
-        while ( ( ich = getc( fp ) ) != EOF )
+          send_headers( 200, "Ok", (char*) 0, get_mime_type( file ), sb.st_size, sb.st_mtime );
+          while ( ( ich = getc( fp ) ) != EOF )
             putchar( ich );
+      }    
+      close(cli_fd);
+*/
     }
     
+    destroy_q(q);
+
+    for (int i = 0; i < n_thread; ++i)
+      pthread_join(threads[i], NULL);
+
+    free_thread_pool();
+
+    close(serv_fd);
     (void) fflush( stdout );
     exit( 0 );
 }
 
+void* 
+work(void *param)
+{
+  while (true)
+  {
+    pthread_rwlock_wrlock(&rw_lock);
+    
+    while (is_empty(q))
+      pthread_cond_wait(&is_q_empty, &rw_lock);
+       
+    QElem *elem = front(q);
+    pop(q);
+
+    pthread_rwlock_unlock(&rw_lock);
+
+    printf("wawa %s\n", elem->path);
+
+    free(elem);    
+  }
+
+  pthread_exit(0);
+}
 
 static void
 file_details( char *dir, char *name )
@@ -190,7 +228,6 @@ file_details( char *dir, char *name )
         (void) printf( "<a href=\"%s\">%-32.32s</a>    %15s %14lld\n", encoded_name, name, timestr, (long long) sb.st_size );
     }
 }
-*/
 
 static void
 send_error( int status, char *title, char *extra_header, char *text )
@@ -212,7 +249,7 @@ send_error( int status, char *title, char *extra_header, char *text )
   </body>\n\
 </html>\n", SERVER_URL, SERVER_NAME );
     (void) fflush( stdout );
-    exit( 1 );
+// exit( 1 );
 }
 
 
