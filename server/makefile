@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Wall
+LIBS = -lpthread
 
 TARGET = server
 SRCS = $(wildcard *.c)
@@ -8,7 +9,7 @@ OBJS = $(SRCS:%.c=%.o)
 all : $(TARGET)
 
 $(TARGET) : $(OBJS)
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ $(LIBS)
 
 $(OBJS) : %.o : %.c
 	$(CC) $(CFLAGS) -o $@ -c $<  
